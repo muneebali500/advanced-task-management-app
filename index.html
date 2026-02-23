@@ -1,0 +1,551 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Vivid Tasks – Modern Task Management</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="style.css" />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+    />
+  </head>
+
+  <body>
+    <div class="app-container">
+      <!-- Mobile Menu Toggle -->
+      <button class="menu-toggle" id="menuToggle">
+        <i class="fas fa-bars"></i>
+      </button>
+
+      <!-- Left Sidebar -->
+      <aside class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+          <div class="app-icon">
+            <i class="fas fa-bolt"></i>
+          </div>
+          <h1>Vivid Tasks</h1>
+          <p class="app-tagline">Focus on what matters</p>
+        </div>
+
+        <div class="user-profile">
+          <div class="profile-avatar">VS</div>
+          <div class="profile-info">
+            <h3>Vivid User</h3>
+            <p><span id="completedTasksCount">0</span> tasks completed</p>
+          </div>
+        </div>
+
+        <nav class="sidebar-nav">
+          <div class="nav-section">
+            <h4 class="nav-title">Views</h4>
+            <a href="#" class="nav-item active" data-filter="all">
+              <i class="fas fa-layer-group"></i>
+              <span>All Tasks</span>
+              <span class="nav-count" id="countTotal">0</span>
+            </a>
+            <a href="#" class="nav-item" data-filter="today">
+              <i class="fas fa-clock"></i>
+              <span>Today</span>
+              <span class="nav-count" id="countToday">0</span>
+            </a>
+            <a href="#" class="nav-item" data-filter="upcoming">
+              <i class="fas fa-calendar-week"></i>
+              <span>Upcoming</span>
+              <span class="nav-count" id="countUpcoming">0</span>
+            </a>
+            <a href="#" class="nav-item" data-filter="active">
+              <i class="fas fa-star"></i>
+              <span>Active</span>
+              <span class="nav-count" id="countActive">0</span>
+            </a>
+            <a href="#" class="nav-item" data-filter="done">
+              <i class="fas fa-check-circle"></i>
+              <span>Completed</span>
+              <span class="nav-count" id="countDone">0</span>
+            </a>
+          </div>
+
+          <div class="nav-section">
+            <h4 class="nav-title">Categories</h4>
+            <a href="#" class="nav-item" data-filter="work">
+              <span class="category-color work"></span>
+              <span>Work</span>
+            </a>
+            <a href="#" class="nav-item" data-filter="personal">
+              <span class="category-color personal"></span>
+              <span>Personal</span>
+            </a>
+            <a href="#" class="nav-item" data-filter="health">
+              <span class="category-color health"></span>
+              <span>Health</span>
+            </a>
+            <a href="#" class="nav-item" data-filter="learning">
+              <span class="category-color learning"></span>
+              <span>Learning</span>
+            </a>
+          </div>
+        </nav>
+      </aside>
+
+      <!-- Main Content -->
+      <main class="main-content">
+        <!-- Header -->
+        <header class="main-header">
+          <div class="header-left">
+            <h2>Task Dashboard</h2>
+            <p class="header-subtitle">
+              Welcome back! You have <span id="activeTaskCount">0</span> active
+              tasks
+            </p>
+          </div>
+
+          <div class="header-right">
+            <div class="header-stats">
+              <div class="stat-item">
+                <span class="stat-value" id="todayCount">0</span>
+                <span class="stat-label">Today</span>
+              </div>
+              <div class="stat-item">
+                <span class="stat-value" id="overdueCount">0</span>
+                <span class="stat-label">Overdue</span>
+              </div>
+              <div class="stat-item">
+                <span class="stat-value" id="completionRate">0%</span>
+                <span class="stat-label">Done</span>
+              </div>
+            </div>
+
+            <div class="header-actions">
+              <button
+                class="btn-icon"
+                id="btnNotifications"
+                title="About this app"
+              >
+                <i class="fas fa-info"></i>
+              </button>
+              <button class="btn-icon" id="btnSearchToggle">
+                <i class="fas fa-search"></i>
+              </button>
+              <button class="btn-primary" id="btnNewTask">
+                <i class="fas fa-plus"></i>
+                <span class="btn-text">New Task</span>
+              </button>
+            </div>
+          </div>
+        </header>
+
+        <!-- Quick Actions Bar -->
+        <div class="quick-actions">
+          <div class="search-container" id="searchContainer">
+            <i class="fas fa-search"></i>
+            <input
+              type="text"
+              id="searchInput"
+              placeholder="Search tasks, projects, or tags..."
+            />
+            <button class="btn-clear-search" id="btnClearSearch">
+              <i class="fas fa-times"></i>
+            </button>
+          </div>
+
+          <div class="quick-filters">
+            <button class="filter-chip active" data-filter="all">All</button>
+            <button class="filter-chip" data-filter="today">Today</button>
+            <button class="filter-chip" data-filter="high">
+              High Priority
+            </button>
+            <button class="filter-chip" data-filter="overdue">Overdue</button>
+            <button class="filter-chip" data-filter="no-date">No Date</button>
+          </div>
+        </div>
+
+        <div class="section-wrapper">
+          <!-- Task Creation Panel -->
+          <section class="task-creator" id="taskCreator">
+            <div class="creator-header">
+              <h3><i class="fas fa-pen"></i> Create New Task</h3>
+              <button class="btn-close-creator" id="btnCloseCreator">
+                <i class="fas fa-times"></i>
+              </button>
+            </div>
+
+            <form id="todoForm" class="task-form" autocomplete="off">
+              <div class="form-group">
+                <input
+                  id="todoText"
+                  type="text"
+                  placeholder="What needs to be done? (e.g., Finish project proposal)"
+                  maxlength="120"
+                  required
+                  class="task-title-input"
+                />
+              </div>
+
+              <div class="form-grid">
+                <div class="form-group">
+                  <label for="todoDue">
+                    <i class="far fa-calendar"></i> Due Date
+                  </label>
+                  <input id="todoDue" type="date" />
+                </div>
+
+                <div class="form-group">
+                  <label for="todoPriority">
+                    <i class="fas fa-flag"></i> Priority
+                  </label>
+                  <div class="priority-selector">
+                    <button
+                      type="button"
+                      class="priority-option"
+                      data-priority="low"
+                    >
+                      <span class="priority-dot low"></span>
+                      Low
+                    </button>
+                    <button
+                      type="button"
+                      class="priority-option active"
+                      data-priority="med"
+                    >
+                      <span class="priority-dot med"></span>
+                      Medium
+                    </button>
+                    <button
+                      type="button"
+                      class="priority-option"
+                      data-priority="high"
+                    >
+                      <span class="priority-dot high"></span>
+                      High
+                    </button>
+                    <input type="hidden" id="todoPriority" value="med" />
+                  </div>
+                </div>
+
+                <div class="form-group">
+                  <label for="todoTag">
+                    <i class="fas fa-tag"></i> Category
+                  </label>
+                  <div class="category-selector">
+                    <button
+                      type="button"
+                      class="category-option"
+                      data-category="work"
+                    >
+                      <span class="category-badge work"></span>
+                      Work
+                    </button>
+                    <button
+                      type="button"
+                      class="category-option"
+                      data-category="personal"
+                    >
+                      <span class="category-badge personal"></span>
+                      Personal
+                    </button>
+                    <button
+                      type="button"
+                      class="category-option"
+                      data-category="health"
+                    >
+                      <span class="category-badge health"></span>
+                      Health
+                    </button>
+                    <input type="hidden" id="todoTag" value="" />
+                  </div>
+                </div>
+
+                <div class="form-group">
+                  <label>Quick Actions</label>
+                  <div class="quick-action-buttons">
+                    <button
+                      type="button"
+                      class="quick-action"
+                      data-quick="today"
+                    >
+                      <i class="far fa-sun"></i> Today
+                    </button>
+                    <button
+                      type="button"
+                      class="quick-action"
+                      data-quick="tomorrow"
+                    >
+                      <i class="far fa-moon"></i> Tomorrow
+                    </button>
+                    <button
+                      type="button"
+                      class="quick-action"
+                      data-quick="weekend"
+                    >
+                      <i class="far fa-calendar-alt"></i> This Weekend
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div class="form-actions">
+                <button type="button" class="btn-secondary" id="btnCancelTask">
+                  Cancel
+                </button>
+                <button type="submit" class="btn-submit">
+                  <i class="fas fa-plus"></i>
+                  <span id="submitBtnText">Add Task</span>
+                </button>
+              </div>
+            </form>
+          </section>
+
+          <!-- Task List -->
+          <section class="task-list-section">
+            <div class="section-header">
+              <h3>My Tasks</h3>
+              <div class="sort-controls">
+                <label for="sortBy">Sort by:</label>
+                <select id="sortBy" class="sort-select">
+                  <option value="manual">Manual</option>
+                  <option value="due">Due Date</option>
+                  <option value="priority">Priority</option>
+                  <option value="created">Created Date</option>
+                  <option value="alphabetical">Alphabetical</option>
+                </select>
+
+                <button
+                  class="btn-icon"
+                  id="btnClearDone"
+                  title="Clear Completed"
+                >
+                  <i class="fas fa-trash-alt"></i>
+                </button>
+              </div>
+            </div>
+
+            <div class="task-list-container">
+              <div id="emptyState" class="empty-state">
+                <div class="empty-state-icon">
+                  <i class="far fa-clipboard"></i>
+                </div>
+                <h3>No tasks yet</h3>
+                <p>
+                  Start by creating your first task. Click "New Task" above or
+                  use the quick create form.
+                </p>
+                <button class="btn-primary" id="btnEmptyNewTask">
+                  <i class="fas fa-plus"></i> Create Your First Task
+                </button>
+              </div>
+
+              <ul id="todoList" class="task-list"></ul>
+            </div>
+          </section>
+        </div>
+
+        <!-- Task Detail Panel -->
+        <aside class="task-detail" id="taskDetail">
+          <div class="detail-header">
+            <h3>Task Details</h3>
+            <button class="btn-close-detail" id="btnCloseDetail">
+              <i class="fas fa-times"></i>
+            </button>
+          </div>
+
+          <div class="detail-content">
+            <div class="detail-placeholder">
+              <i class="far fa-file-alt"></i>
+              <p>Select a task to view details</p>
+            </div>
+          </div>
+        </aside>
+      </main>
+
+      <!-- Info Popup Overlay -->
+      <div class="popup-overlay" id="popupOverlay">
+        <div class="popup-content">
+          <div class="popup-header">
+            <h2><i class="fas fa-bolt"></i> Vivid Tasks</h2>
+            <p class="popup-subtitle">
+              Modern Task Management — Focus on what matters
+            </p>
+          </div>
+
+          <div class="popup-section">
+            <h3>📖 What It Does</h3>
+            <p>
+              Vivid Tasks is a feature-rich personal task manager that helps you
+              organize, prioritize, and track everything on your plate. With
+              category filtering, time tracking, drag-and-drop reordering, and
+              smart stats — staying productive has never looked better.
+            </p>
+          </div>
+
+          <div class="popup-section">
+            <h3>🎮 How to Use</h3>
+            <ul>
+              <li>
+                Click <strong>New Task</strong> (or press <kbd>N</kbd>) to
+                create a task
+              </li>
+              <li>
+                Set a due date, priority level, and category for each task
+              </li>
+              <li>
+                Use the sidebar or filter chips to view tasks by status or
+                category
+              </li>
+              <li>
+                Click any task to open the detail panel with time tracking
+              </li>
+              <li>Drag and drop tasks to reorder them manually</li>
+              <li>
+                Use the sort dropdown to order by due date, priority, or name
+              </li>
+              <li>Press <kbd>Esc</kbd> to close any open panel</li>
+            </ul>
+          </div>
+
+          <div class="popup-section">
+            <h3>✨ Key Features</h3>
+            <div class="highlight-box">
+              <ul style="margin: 0">
+                <li>
+                  <strong>Time Tracking:</strong> Built-in timer per task to log
+                  time spent
+                </li>
+                <li>
+                  <strong>Smart Filters:</strong> Today, Upcoming, Overdue, High
+                  Priority & more
+                </li>
+                <li>
+                  <strong>Categories:</strong> Work, Personal, Health, Learning
+                </li>
+                <li>
+                  <strong>Drag & Drop:</strong> Reorder tasks with manual
+                  sorting
+                </li>
+                <li>
+                  <strong>Live Stats:</strong> Completion rate, overdue count,
+                  today's tasks
+                </li>
+                <li>
+                  <strong>Responsive:</strong> Works seamlessly on mobile and
+                  desktop
+                </li>
+                <li>
+                  <strong>Persistent:</strong> Tasks saved locally — no account
+                  needed
+                </li>
+              </ul>
+            </div>
+          </div>
+
+          <div class="popup-section">
+            <h3>💻 Built With</h3>
+            <div class="tech-tags">
+              <span class="tech-tag">HTML5</span>
+              <span class="tech-tag">CSS3</span>
+              <span class="tech-tag">Vanilla JavaScript</span>
+              <span class="tech-tag">LocalStorage</span>
+              <span class="tech-tag">Drag & Drop API</span>
+              <span class="tech-tag">Font Awesome</span>
+            </div>
+          </div>
+
+          <div class="popup-section">
+            <h3>🚀 Key JavaScript Concepts</h3>
+            <div class="highlight-box">
+              <ul style="margin: 0">
+                <li>
+                  <strong>Class-based Architecture:</strong> Full OOP approach
+                  with a single <code>VividTasks</code> class managing all state
+                </li>
+                <li>
+                  <strong>localStorage:</strong> Persistent data storage — tasks
+                  survive page refreshes
+                </li>
+                <li>
+                  <strong>Drag & Drop API:</strong> Native HTML5 dragstart,
+                  dragover, and drop events for reordering
+                </li>
+                <li>
+                  <strong>setInterval / clearInterval:</strong> Precise per-task
+                  time tracking with live display updates
+                </li>
+                <li>
+                  <strong>DOM Manipulation:</strong> Dynamic task rendering via
+                  innerHTML and event delegation
+                </li>
+                <li>
+                  <strong>Event Handling:</strong> Keyboard shortcuts, filter
+                  chips, form submissions, and inline handlers
+                </li>
+                <li>
+                  <strong>Array Methods:</strong> filter(), find(), findIndex(),
+                  map(), sort() for task management
+                </li>
+                <li>
+                  <strong>ES6+ Features:</strong> Arrow functions, template
+                  literals, destructuring, spread operator
+                </li>
+              </ul>
+            </div>
+          </div>
+
+          <div class="popup-section">
+            <h3>🎨 Design Features</h3>
+            <ul>
+              <li>
+                Dual-font system — <strong>Poppins</strong> for body text,
+                <strong>Space Grotesk</strong> for headings
+              </li>
+              <li>
+                CSS custom properties (variables) for consistent theming
+                throughout
+              </li>
+              <li>
+                Smooth micro-interactions — hover lifts, active states, and
+                slide-in animations
+              </li>
+              <li>
+                Responsive grid layout adapting from 3-column desktop to
+                single-column mobile
+              </li>
+              <li>
+                Priority-coded color system: red for high, amber for medium,
+                green for low
+              </li>
+              <li>
+                Slide-down task creator with animated entrance and graceful exit
+              </li>
+              <li>
+                Toast notification system with type-based color coding and
+                auto-dismiss
+              </li>
+              <li>
+                Accessible focus states, high-contrast mode support, and
+                reduced-motion respect
+              </li>
+            </ul>
+          </div>
+
+          <button class="close-popup-btn" id="closePopupBtn">
+            <i class="fas fa-rocket"></i> Let's Get Productive!
+          </button>
+        </div>
+      </div>
+
+      <!-- Toast Container -->
+      <div id="toastHost" class="toast-container"></div>
+
+      <!-- Sidebar Overlay for Mobile -->
+      <div class="sidebar-overlay" id="sidebarOverlay"></div>
+    </div>
+
+    <script src="app.js"></script>
+  </body>
+</html>
