@@ -363,6 +363,278 @@ class VividTasks {
     this.editingTaskId = null;
     document.getElementById("submitBtnText").textContent = "Add Task";
   }
+
+  editTask(taskId) {
+    const task = this.tasks.find((t) => t.id === taskId);
+    if (!task) return;
+
+    this.editingTaskId = taskId;
+
+    // Fill form with task data
+    document.getElementById("todoText").value = task.title;
+    document.getElementById("todoDue").value = task.dueDate || "";
+    this.setPriority(task.priority);
+    this.setCategory(task.category);
+    document.getElementById("submitBtnText").textContent = "Update Task";
+
+    // Show task creator
+    this.toggleTaskCreator(true);
+
+    // Close task detail on mobile
+    this.closeTaskDetail();
+  }
+
+  toggleTaskComplete(taskId) {
+    const taskIndex = this.tasks.findIndex((t) => t.id === taskId);
+    if (taskIndex === -1) return;
+
+    this.tasks[taskIndex].completed = !this.tasks[taskIndex].completed;
+
+    // Stop timer if running
+    if (this.timers[taskId]) {
+      this.stopTimer(taskId);
+    }
+
+    this.saveTasks();
+    this.renderTasks();
+    this.updateStats();
+    this.showTaskDetail(taskId);
+
+    const action = this.tasks[taskIndex].completed
+      ? "completed"
+      : "marked active";
+    this.showToast(`Task ${action}`, "success");
+  }
+
+  deleteTask(taskId) {
+    if (!confirm("Are you sure you want to delete this task?")) return;
+
+    this.tasks = this.tasks.filter((t) => t.id !== taskId);
+
+    // Stop and clear timer if running
+    if (this.timers[taskId]) {
+      this.stopTimer(taskId);
+      delete this.timers[taskId];
+    }
+
+    this.saveTasks();
+    this.renderTasks();
+    this.updateStats();
+    this.closeTaskDetail();
+
+    const detailContent = document.querySelector(".detail-content");
+    detailContent.innerHTML = "";
+
+    this.showToast("Task deleted", "danger");
+  }
+
+  clearCompletedTasks() {
+    const completedCount = this.tasks.filter((t) => t.completed).length;
+
+    if (completedCount === 0) {
+      this.showToast("No completed tasks to clear", "info");
+      return;
+    }
+
+    if (
+      !confirm(
+        `Are you sure you want to clear ${completedCount} completed task(s)?`,
+      )
+    )
+      return;
+
+    this.tasks = this.tasks.filter((t) => !t.completed);
+    this.saveTasks();
+    this.renderTasks();
+    this.updateStats();
+
+    this.showToast(`${completedCount} completed task(s) cleared`, "success");
+  }
+
+  getFilteredTasks() {
+    let filtered = [...this.tasks];
+
+    // Apply search filter
+    const searchTerm = document
+      .getElementById("searchInput")
+      .value.toLowerCase();
+    if (searchTerm) {
+      filtered = filtered.filter(
+        (task) =>
+          task.title.toLowerCase().includes(searchTerm) ||
+          task.category.toLowerCase().includes(searchTerm),
+      );
+    }
+
+    // Apply status/category filter
+    const today = new Date().toISOString().split("T")[0];
+    const now = new Date();
+
+    switch (this.currentFilter) {
+      case "active":
+        filtered = filtered.filter((task) => !task.completed);
+        break;
+      case "done":
+        filtered = filtered.filter((task) => task.completed);
+        break;
+      case "today":
+        filtered = filtered.filter((task) => task.dueDate === today);
+        break;
+      case "upcoming":
+        filtered = filtered.filter((task) => {
+          if (!task.dueDate || task.completed) return false;
+          const dueDate = new Date(task.dueDate);
+          const nextWeek = new Date(now);
+          nextWeek.setDate(nextWeek.getDate() + 7);
+          return dueDate > now && dueDate <= nextWeek;
+        });
+        break;
+      case "high":
+        filtered = filtered.filter((task) => task.priority === "high");
+        break;
+      case "overdue":
+        filtered = filtered.filter(
+          (task) =>
+            task.dueDate && !task.completed && new Date(task.dueDate) < now,
+        );
+        break;
+      case "no-date":
+        filtered = filtered.filter((task) => !task.dueDate);
+        break;
+      case "work":
+      case "personal":
+      case "health":
+      case "learning":
+        filtered = filtered.filter(
+          (task) => task.category === this.currentFilter,
+        );
+        break;
+      case "all":
+      default:
+        // Show all tasks
+        break;
+    }
+
+    // Apply sorting
+    this.sortTasks(filtered);
+
+    return filtered;
+  }
+
+  sortTasks(tasks) {
+    switch (this.currentSort) {
+      case "due":
+        tasks.sort((a, b) => {
+          if (!a.dueDate && !b.dueDate) return 0;
+          if (!a.dueDate) return 1;
+          if (!b.dueDate) return -1;
+          return new Date(a.dueDate) - new Date(b.dueDate);
+        });
+        break;
+      case "priority":
+        const priorityOrder = { high: 3, med: 2, low: 1 };
+        tasks.sort(
+          (a, b) => priorityOrder[b.priority] - priorityOrder[a.priority],
+        );
+        break;
+      case "created":
+        tasks.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+        break;
+      case "alphabetical":
+        tasks.sort((a, b) => a.title.localeCompare(b.title));
+        break;
+      case "manual":
+      default:
+        tasks.sort((a, b) => (a.order || 0) - (b.order || 0));
+        break;
+    }
+  }
+
+  renderTasks() {
+    const taskList = document.getElementById("todoList");
+    const emptyState = document.getElementById("emptyState");
+    const filteredTasks = this.getFilteredTasks();
+
+    if (filteredTasks.length === 0) {
+      taskList.innerHTML = "";
+      emptyState.classList.remove("hidden");
+      return;
+    }
+
+    emptyState.classList.add("hidden");
+
+    taskList.innerHTML = filteredTasks
+      .map((task) => this.createTaskElement(task))
+      .join("");
+
+    // Add event listeners to dynamically created elements
+    this.attachTaskEventListeners();
+  }
+
+  createTaskElement(task) {
+    const isOverdue =
+      task.dueDate && !task.completed && new Date(task.dueDate) < new Date();
+    const dueDateText = task.dueDate
+      ? new Date(task.dueDate).toLocaleDateString("en-US", {
+          weekday: "short",
+          month: "short",
+          day: "numeric",
+        })
+      : "No due date";
+
+    const priorityLabels = {
+      high: "High",
+      med: "Medium",
+      low: "Low",
+    };
+
+    const categoryLabels = {
+      work: "Work",
+      personal: "Personal",
+      health: "Health",
+      learning: "Learning",
+      other: "Other",
+    };
+
+    return `
+      <li class="task-item ${task.completed ? "done" : ""}" data-id="${
+        task.id
+      }" draggable="true">
+        <div class="task-checkbox ${
+          task.completed ? "checked" : ""
+        }" onclick="app.toggleTaskComplete('${task.id}')">
+          ${task.completed ? '<i class="fas fa-check"></i>' : ""}
+        </div>
+        <div class="task-content" onclick="app.showTaskDetail('${task.id}')">
+          <div class="task-title">${this.escapeHtml(task.title)}</div>
+          <div class="task-meta">
+            <span class="task-priority ${task.priority}">${
+              priorityLabels[task.priority]
+            }</span>
+            <span class="task-date ${isOverdue ? "overdue" : ""}">
+              <i class="far fa-calendar"></i>
+              ${dueDateText} ${isOverdue ? "(Overdue)" : ""}
+            </span>
+            <span class="task-category">${
+              categoryLabels[task.category] || task.category
+            }</span>
+          </div>
+        </div>
+        <div class="task-actions">
+          <button class="task-action-btn edit" onclick="app.editTask('${
+            task.id
+          }')" title="Edit task">
+            <i class="fas fa-edit"></i>
+          </button>
+          <button class="task-action-btn delete" onclick="app.deleteTask('${
+            task.id
+          }')" title="Delete task">
+            <i class="fas fa-trash-alt"></i>
+          </button>
+        </div>
+      </li>
+    `;
+  }
 }
 
 // Initialize the app when DOM is loaded
