@@ -635,6 +635,425 @@ class VividTasks {
       </li>
     `;
   }
+
+  attachTaskEventListeners() {
+    // Drag and drop events
+    document.querySelectorAll(".task-item").forEach((item) => {
+      item.addEventListener("dragstart", (e) => {
+        this.draggedItem = e.currentTarget;
+        e.currentTarget.classList.add("dragging");
+      });
+
+      item.addEventListener("dragend", (e) => {
+        e.currentTarget.classList.remove("dragging");
+        this.draggedItem = null;
+      });
+
+      item.addEventListener("dragover", (e) => {
+        e.preventDefault();
+        const afterElement = this.getDragAfterElement(
+          document.getElementById("todoList"),
+          e.clientY,
+        );
+        const container = document.getElementById("todoList");
+
+        if (afterElement == null) {
+          container.appendChild(this.draggedItem);
+        } else {
+          container.insertBefore(this.draggedItem, afterElement);
+        }
+      });
+    });
+  }
+
+  getDragAfterElement(container, y) {
+    const draggableElements = [
+      ...container.querySelectorAll(".task-item:not(.dragging)"),
+    ];
+
+    return draggableElements.reduce(
+      (closest, child) => {
+        const box = child.getBoundingClientRect();
+        const offset = y - box.top - box.height / 2;
+
+        if (offset < 0 && offset > closest.offset) {
+          return { offset: offset, element: child };
+        } else {
+          return closest;
+        }
+      },
+      { offset: Number.NEGATIVE_INFINITY },
+    ).element;
+  }
+
+  setupDragAndDrop() {
+    const taskList = document.getElementById("todoList");
+
+    taskList.addEventListener("dragover", (e) => {
+      e.preventDefault();
+    });
+
+    taskList.addEventListener("drop", (e) => {
+      e.preventDefault();
+      if (this.draggedItem) {
+        this.updateTaskOrder();
+        this.showToast("Task order updated", "success");
+      }
+    });
+  }
+
+  updateTaskOrder() {
+    const taskElements = document.querySelectorAll(".task-item");
+    taskElements.forEach((element, index) => {
+      const taskId = element.getAttribute("data-id");
+      const taskIndex = this.tasks.findIndex((t) => t.id === taskId);
+      if (taskIndex !== -1) {
+        this.tasks[taskIndex].order = index;
+      }
+    });
+
+    this.saveTasks();
+  }
+
+  showTaskDetail(taskId) {
+    const task = this.tasks.find((t) => t.id === taskId);
+    if (!task) return;
+
+    const detailContent = document.querySelector(".detail-content");
+    const isOverdue =
+      task.dueDate && !task.completed && new Date(task.dueDate) < new Date();
+
+    const priorityLabels = { high: "High", med: "Medium", low: "Low" };
+    const priorityColors = { high: "#ef4444", med: "#f59e0b", low: "#10b981" };
+    const categoryLabels = {
+      work: "Work",
+      personal: "Personal",
+      health: "Health",
+      learning: "Learning",
+      other: "Other",
+    };
+
+    const timeSpent = this.formatTime(task.timeSpent || 0);
+    const isTimerRunning = this.timers[taskId] && this.timers[taskId].running;
+
+    detailContent.innerHTML = `
+      <div class="task-detail-view">
+        <div class="detail-header-row">
+          <h4>${this.escapeHtml(task.title)}</h4>
+          <span class="task-status ${task.completed ? "completed" : "active"}">
+            ${task.completed ? "Completed" : "Active"}
+          </span>
+        </div>
+        
+        <div class="detail-section">
+          <h5><i class="fas fa-info-circle"></i> Details</h5>
+          <div class="detail-grid">
+            <div class="detail-item">
+              <span class="detail-label">Priority:</span>
+              <span class="detail-value priority-badge" style="background: ${
+                priorityColors[task.priority]
+              }20; color: ${priorityColors[task.priority]}">
+                <span class="priority-dot" style="background: ${
+                  priorityColors[task.priority]
+                }"></span>
+                ${priorityLabels[task.priority]}
+              </span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">Category:</span>
+              <span class="detail-value">${
+                categoryLabels[task.category] || task.category
+              }</span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">Due Date:</span>
+              <span class="detail-value ${isOverdue ? "overdue" : ""}">
+                ${
+                  task.dueDate
+                    ? new Date(task.dueDate).toLocaleDateString("en-US", {
+                        weekday: "long",
+                        year: "numeric",
+                        month: "long",
+                        day: "numeric",
+                      })
+                    : "Not set"
+                }
+                ${isOverdue ? '<span class="overdue-badge">Overdue</span>' : ""}
+              </span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">Created:</span>
+              <span class="detail-value">
+                ${new Date(task.createdAt).toLocaleDateString("en-US", {
+                  month: "short",
+                  day: "numeric",
+                  year: "numeric",
+                })}
+              </span>
+            </div>
+          </div>
+        </div>
+        
+        <div class="detail-section">
+          <h5><i class="fas fa-cog"></i> Actions</h5>
+          <div class="action-buttons">
+            <button class="btn-action" onclick="app.toggleTaskComplete('${
+              task.id
+            }')">
+              <i class="fas ${task.completed ? "fa-undo" : "fa-check"}"></i>
+              ${task.completed ? "Mark as Active" : "Mark Complete"}
+            </button>
+            <button class="btn-action" onclick="app.editTask('${task.id}')">
+              <i class="fas fa-edit"></i>
+              Edit Task
+            </button>
+            <button class="btn-action delete" onclick="app.deleteTask('${
+              task.id
+            }')">
+              <i class="fas fa-trash-alt"></i>
+              Delete Task
+            </button>
+          </div>
+        </div>
+        
+        <div class="detail-section">
+          <h5><i class="far fa-clock"></i> Time Tracking</h5>
+          <div class="time-tracking">
+            <div class="time-display">
+              <span class="time-label">Time Spent:</span>
+              <span class="time-value" id="time-${task.id}">${timeSpent}</span>
+            </div>
+            <div class="time-controls">
+              <button class="btn-time ${
+                isTimerRunning ? "active" : ""
+              }" onclick="app.${isTimerRunning ? "stopTimer" : "startTimer"}('${
+                task.id
+              }')" id="timer-btn-${task.id}">
+                <i class="fas ${isTimerRunning ? "fa-pause" : "fa-play"}"></i> 
+                ${isTimerRunning ? "Pause" : "Start"} Timer
+              </button>
+              <button class="btn-time" onclick="app.resetTimer('${task.id}')" ${
+                task.timeSpent ? "" : "disabled"
+              }>
+                <i class="fas fa-redo"></i> Reset
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+
+    // Show detail panel
+    document.querySelector(".task-detail").classList.add("active");
+  }
+
+  formatTime(seconds) {
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const secs = seconds % 60;
+
+    if (hours > 0) {
+      return `${hours}h ${minutes}m`;
+    } else if (minutes > 0) {
+      return `${minutes}m ${secs}s`;
+    } else {
+      return `${secs}s`;
+    }
+  }
+
+  startTimer(taskId) {
+    const task = this.tasks.find((t) => t.id === taskId);
+    if (!task) return;
+
+    if (this.timers[taskId] && this.timers[taskId].running) {
+      return;
+    }
+
+    this.timers[taskId] = {
+      running: true,
+      startTime: Date.now(),
+      interval: setInterval(() => {
+        const taskIndex = this.tasks.findIndex((t) => t.id === taskId);
+        if (taskIndex !== -1) {
+          this.tasks[taskIndex].timeSpent =
+            (this.tasks[taskIndex].timeSpent || 0) + 1;
+          this.saveTasks();
+
+          // Update display if detail panel is open
+          const timeDisplay = document.getElementById(`time-${taskId}`);
+          if (timeDisplay) {
+            timeDisplay.textContent = this.formatTime(
+              this.tasks[taskIndex].timeSpent,
+            );
+          }
+        }
+      }, 1000),
+    };
+
+    // Update button
+    const btn = document.getElementById(`timer-btn-${taskId}`);
+    if (btn) {
+      btn.innerHTML = '<i class="fas fa-pause"></i> Pause Timer';
+      btn.classList.add("active");
+      btn.setAttribute("onclick", `app.stopTimer('${taskId}')`);
+    }
+
+    // Enable reset button
+    const resetBtn = document.querySelector(
+      `#timer-btn-${taskId}`,
+    ).nextElementSibling;
+    if (resetBtn) {
+      resetBtn.disabled = false;
+    }
+
+    this.showToast("Timer started", "success");
+  }
+
+  stopTimer(taskId) {
+    if (!this.timers[taskId] || !this.timers[taskId].running) {
+      return;
+    }
+
+    clearInterval(this.timers[taskId].interval);
+    this.timers[taskId].running = false;
+
+    // Update button
+    const btn = document.getElementById(`timer-btn-${taskId}`);
+    if (btn) {
+      btn.innerHTML = '<i class="fas fa-play"></i> Start Timer';
+      btn.classList.remove("active");
+      btn.setAttribute("onclick", `app.startTimer('${taskId}')`);
+    }
+
+    this.showToast("Timer paused", "info");
+  }
+
+  resetTimer(taskId) {
+    if (!confirm("Are you sure you want to reset the timer for this task?")) {
+      return;
+    }
+
+    // Stop timer if running
+    if (this.timers[taskId]) {
+      this.stopTimer(taskId);
+    }
+
+    // Reset time
+    const taskIndex = this.tasks.findIndex((t) => t.id === taskId);
+    if (taskIndex !== -1) {
+      this.tasks[taskIndex].timeSpent = 0;
+      this.saveTasks();
+
+      // Update display
+      const timeDisplay = document.getElementById(`time-${taskId}`);
+      if (timeDisplay) {
+        timeDisplay.textContent = this.formatTime(0);
+      }
+
+      // Disable reset button
+      const resetBtn = document.querySelector(
+        `#timer-btn-${taskId}`,
+      ).nextElementSibling;
+      if (resetBtn) {
+        resetBtn.disabled = true;
+      }
+    }
+
+    this.showToast("Timer reset", "success");
+  }
+
+  updateStats() {
+    const totalTasks = this.tasks.length;
+    const activeTasks = this.tasks.filter((t) => !t.completed).length;
+    const completedTasks = this.tasks.filter((t) => t.completed).length;
+
+    // Today's tasks
+    const today = new Date().toISOString().split("T")[0];
+    const todayTasks = this.tasks.filter(
+      (t) => t.dueDate === today && !t.completed,
+    ).length;
+
+    // Upcoming tasks (next 7 days)
+    const now = new Date();
+    const nextWeek = new Date(now);
+    nextWeek.setDate(nextWeek.getDate() + 7);
+    const upcomingTasks = this.tasks.filter((t) => {
+      if (!t.dueDate || t.completed) return false;
+      const dueDate = new Date(t.dueDate);
+      return dueDate > now && dueDate <= nextWeek;
+    }).length;
+
+    // Overdue tasks
+    const overdueTasks = this.tasks.filter(
+      (t) => t.dueDate && !t.completed && new Date(t.dueDate) < now,
+    ).length;
+
+    // Completion rate
+    const completionRate =
+      totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+
+    // Update DOM
+    document.getElementById("countTotal").textContent = totalTasks;
+    document.getElementById("countActive").textContent = activeTasks;
+    document.getElementById("countDone").textContent = completedTasks;
+    document.getElementById("countToday").textContent = todayTasks;
+    document.getElementById("countUpcoming").textContent = upcomingTasks;
+    document.getElementById("activeTaskCount").textContent = activeTasks;
+    document.getElementById("todayCount").textContent = todayTasks;
+    document.getElementById("overdueCount").textContent = overdueTasks;
+    document.getElementById("completionRate").textContent =
+      `${completionRate}%`;
+    document.getElementById("completedTasksCount").textContent = completedTasks;
+  }
+
+  saveTasks() {
+    localStorage.setItem("vividTasks", JSON.stringify(this.tasks));
+  }
+
+  showToast(message, type = "info") {
+    const toastHost = document.getElementById("toastHost");
+    const toastId = "toast-" + Date.now();
+
+    const icons = {
+      success: "fa-check-circle",
+      warning: "fa-exclamation-triangle",
+      danger: "fa-times-circle",
+      info: "fa-info-circle",
+    };
+
+    const toast = document.createElement("div");
+    toast.className = `toast ${type}`;
+    toast.id = toastId;
+    toast.innerHTML = `
+      <div class="toast-icon">
+        <i class="fas ${icons[type] || "fa-info-circle"}"></i>
+      </div>
+      <div class="toast-content">
+        <div class="toast-title">${
+          type.charAt(0).toUpperCase() + type.slice(1)
+        }</div>
+        <div class="toast-message">${message}</div>
+      </div>
+      <button class="toast-close" onclick="document.getElementById('${toastId}').remove()">
+        <i class="fas fa-times"></i>
+      </button>
+    `;
+
+    toastHost.appendChild(toast);
+
+    // Auto remove after 5 seconds
+    setTimeout(() => {
+      if (document.getElementById(toastId)) {
+        toast.remove();
+      }
+    }, 5000);
+  }
+
+  escapeHtml(text) {
+    const div = document.createElement("div");
+    div.textContent = text;
+    return div.innerHTML;
+  }
 }
 
 // Initialize the app when DOM is loaded
@@ -642,9 +1061,9 @@ let app;
 
 document.addEventListener("DOMContentLoaded", () => {
   app = new VividTasks();
-});
 
-document.getElementById("popupOverlay").classList.add("active");
+  document.getElementById("popupOverlay").classList.add("active");
+});
 
 // Make app available globally for inline event handlers
 window.app = app;
