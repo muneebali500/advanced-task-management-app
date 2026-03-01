@@ -1,15 +1,87 @@
-// app.js - Complete Vivid Tasks Application with Full Functionality
+// app.js - Optimized Vivid Tasks Application
 
 class VividTasks {
   constructor() {
-    this.tasks = JSON.parse(localStorage.getItem("vividTasks")) || [];
+    this.tasks = this._safeParseJSON(localStorage.getItem("vividTasks")) || [];
     this.currentFilter = "all";
     this.currentSort = "manual";
     this.editingTaskId = null;
     this.draggedItem = null;
     this.timers = {};
 
+    // ── Cache all DOM references once ──────────────────────────────────────
+    this.dom = {
+      taskList: document.getElementById("todoList"),
+      emptyState: document.getElementById("emptyState"),
+      todoForm: document.getElementById("todoForm"),
+      todoText: document.getElementById("todoText"),
+      todoDue: document.getElementById("todoDue"),
+      todoPriority: document.getElementById("todoPriority"),
+      todoTag: document.getElementById("todoTag"),
+      submitBtnText: document.getElementById("submitBtnText"),
+      searchInput: document.getElementById("searchInput"),
+      searchContainer: document.getElementById("searchContainer"),
+      toastHost: document.getElementById("toastHost"),
+      sortBy: document.getElementById("sortBy"),
+      btnNewTask: document.getElementById("btnNewTask"),
+      btnCloseCreator: document.getElementById("btnCloseCreator"),
+      btnCancelTask: document.getElementById("btnCancelTask"),
+      btnEmptyNewTask: document.getElementById("btnEmptyNewTask"),
+      btnClearDone: document.getElementById("btnClearDone"),
+      btnClearSearch: document.getElementById("btnClearSearch"),
+      btnSearchToggle: document.getElementById("btnSearchToggle"),
+      btnNotifications: document.getElementById("btnNotifications"),
+      btnCloseDetail: document.getElementById("btnCloseDetail"),
+      menuToggle: document.getElementById("menuToggle"),
+      sidebar: document.getElementById("sidebar"),
+      sidebarOverlay: document.getElementById("sidebarOverlay"),
+      popupOverlay: document.getElementById("popupOverlay"),
+      closePopupBtn: document.getElementById("closePopupBtn"),
+      taskCreator: document.querySelector(".task-creator"),
+      taskDetail: document.querySelector(".task-detail"),
+      detailContent: document.querySelector(".detail-content"),
+      // Stats
+      countTotal: document.getElementById("countTotal"),
+      countActive: document.getElementById("countActive"),
+      countDone: document.getElementById("countDone"),
+      countToday: document.getElementById("countToday"),
+      countUpcoming: document.getElementById("countUpcoming"),
+      activeTaskCount: document.getElementById("activeTaskCount"),
+      todayCount: document.getElementById("todayCount"),
+      overdueCount: document.getElementById("overdueCount"),
+      completionRate: document.getElementById("completionRate"),
+      completedTasksCount: document.getElementById("completedTasksCount"),
+    };
+
+    // ── Lookup maps (avoid repeated object literals in render loops) ────────
+    this.PRIORITY_LABELS = { high: "High", med: "Medium", low: "Low" };
+    this.PRIORITY_COLORS = { high: "#ef4444", med: "#f59e0b", low: "#10b981" };
+    this.CATEGORY_LABELS = {
+      work: "Work",
+      personal: "Personal",
+      health: "Health",
+      learning: "Learning",
+      other: "Other",
+    };
+    this.PRIORITY_ORDER = { high: 3, med: 2, low: 1 };
+    this.TOAST_ICONS = {
+      success: "fa-check-circle",
+      warning: "fa-exclamation-triangle",
+      danger: "fa-times-circle",
+      info: "fa-info-circle",
+    };
+
     this.init();
+  }
+
+  // ── Safe JSON parse — prevents crash on corrupted localStorage data ───────
+  _safeParseJSON(value) {
+    try {
+      return JSON.parse(value);
+    } catch {
+      console.warn("VividTasks: corrupted localStorage data — resetting.");
+      return null;
+    }
   }
 
   init() {
@@ -20,181 +92,148 @@ class VividTasks {
   }
 
   setupEventListeners() {
-    // Task Form
-    const form = document.getElementById("todoForm");
-    form.addEventListener("submit", (e) => this.handleFormSubmit(e));
+    const d = this.dom;
 
-    // Quick date buttons
-    document.querySelectorAll(".quick-action").forEach((btn) => {
-      btn.addEventListener("click", (e) => this.handleQuickDate(e));
-    });
+    d.todoForm.addEventListener("submit", (e) => this.handleFormSubmit(e));
 
-    // Priority selector
-    document.querySelectorAll(".priority-option").forEach((btn) => {
-      btn.addEventListener("click", (e) => this.handlePrioritySelect(e));
-    });
+    document
+      .querySelectorAll(".quick-action")
+      .forEach((btn) =>
+        btn.addEventListener("click", (e) => this.handleQuickDate(e)),
+      );
 
-    // Category selector
-    document.querySelectorAll(".category-option").forEach((btn) => {
-      btn.addEventListener("click", (e) => this.handleCategorySelect(e));
-    });
+    document
+      .querySelectorAll(".priority-option")
+      .forEach((btn) =>
+        btn.addEventListener("click", (e) => this.handlePrioritySelect(e)),
+      );
 
-    // New task button
-    document.getElementById("btnNewTask").addEventListener("click", () => {
-      this.toggleTaskCreator(true);
-    });
+    document
+      .querySelectorAll(".category-option")
+      .forEach((btn) =>
+        btn.addEventListener("click", (e) => this.handleCategorySelect(e)),
+      );
 
-    // Close task creator
-    document.getElementById("btnCloseCreator").addEventListener("click", () => {
-      this.toggleTaskCreator(false);
-    });
+    d.btnNewTask.addEventListener("click", () => this.toggleTaskCreator(true));
+    d.btnCloseCreator.addEventListener("click", () =>
+      this.toggleTaskCreator(false),
+    );
+    d.btnCancelTask.addEventListener("click", () =>
+      this.toggleTaskCreator(false),
+    );
 
-    document.getElementById("btnCancelTask").addEventListener("click", () => {
-      this.toggleTaskCreator(false);
-    });
-
-    // Empty state new task button
-    const emptyBtn = document.getElementById("btnEmptyNewTask");
-    if (emptyBtn) {
-      emptyBtn.addEventListener("click", () => {
-        this.toggleTaskCreator(true);
-      });
+    if (d.btnEmptyNewTask) {
+      d.btnEmptyNewTask.addEventListener("click", () =>
+        this.toggleTaskCreator(true),
+      );
     }
 
-    // Filter chips
-    document.querySelectorAll(".filter-chip").forEach((chip) => {
-      chip.addEventListener("click", (e) => this.handleFilterClick(e));
-    });
+    document
+      .querySelectorAll(".filter-chip")
+      .forEach((chip) =>
+        chip.addEventListener("click", (e) => this.handleFilterClick(e)),
+      );
 
-    // Sidebar navigation
     document.querySelectorAll(".nav-item").forEach((item) => {
       item.addEventListener("click", (e) => {
         e.preventDefault();
         const filter = e.currentTarget.getAttribute("data-filter") || "all";
         this.setFilter(filter);
-
-        // Update active state
         document
           .querySelectorAll(".nav-item")
           .forEach((nav) => nav.classList.remove("active"));
         e.currentTarget.classList.add("active");
-
-        // Close sidebar on mobile
         this.closeSidebar();
       });
     });
 
-    // Sort control
-    document.getElementById("sortBy").addEventListener("change", (e) => {
+    d.sortBy.addEventListener("change", (e) => {
       this.currentSort = e.target.value;
       this.renderTasks();
     });
 
-    // Search
-    const searchInput = document.getElementById("searchInput");
-    searchInput.addEventListener("input", (e) => {
-      this.renderTasks();
-    });
+    // ── Debounced search — avoids re-rendering on every keystroke ──────────
+    d.searchInput.addEventListener(
+      "input",
+      this._debounce(() => this.renderTasks(), 200),
+    );
 
-    // Search toggle (mobile)
-    document.getElementById("btnSearchToggle").addEventListener("click", () => {
-      const searchContainer = document.getElementById("searchContainer");
-      searchContainer.classList.toggle("active");
-      if (searchContainer.classList.contains("active")) {
-        searchInput.focus();
+    d.btnSearchToggle.addEventListener("click", () => {
+      d.searchContainer.classList.toggle("active");
+      if (d.searchContainer.classList.contains("active")) {
+        d.searchInput.focus();
       }
     });
 
-    // Clear done button
-    document.getElementById("btnClearDone").addEventListener("click", () => {
-      this.clearCompletedTasks();
-    });
-
-    // Clear search button
-    document.getElementById("btnClearSearch").addEventListener("click", () => {
-      searchInput.value = "";
+    d.btnClearDone.addEventListener("click", () => this.clearCompletedTasks());
+    d.btnClearSearch.addEventListener("click", () => {
+      d.searchInput.value = "";
       this.renderTasks();
     });
 
-    // Menu toggle (mobile)
-    document.getElementById("menuToggle").addEventListener("click", () => {
-      this.toggleSidebar();
+    d.menuToggle.addEventListener("click", () => this.toggleSidebar());
+    d.sidebarOverlay.addEventListener("click", () => this.closeSidebar());
+    d.btnCloseDetail.addEventListener("click", () => this.closeTaskDetail());
+
+    d.btnNotifications.addEventListener("click", () =>
+      d.popupOverlay.classList.add("active"),
+    );
+    d.closePopupBtn.addEventListener("click", () =>
+      d.popupOverlay.classList.remove("active"),
+    );
+    d.popupOverlay.addEventListener("click", (e) => {
+      if (e.target === d.popupOverlay)
+        d.popupOverlay.classList.remove("active");
     });
 
-    // Sidebar overlay (mobile)
-    document.getElementById("sidebarOverlay").addEventListener("click", () => {
-      this.closeSidebar();
-    });
-
-    // Toggle task detail close
-    document.getElementById("btnCloseDetail").addEventListener("click", () => {
-      this.closeTaskDetail();
-    });
-
-    // Notifications button
-    document
-      .getElementById("btnNotifications")
-      .addEventListener("click", () => {
-        document.getElementById("popupOverlay").classList.add("active");
-      });
-
-    document.getElementById("closePopupBtn").addEventListener("click", () => {
-      document.getElementById("popupOverlay").classList.remove("active");
-    });
-
-    document.getElementById("popupOverlay").addEventListener("click", (e) => {
-      if (e.target === document.getElementById("popupOverlay")) {
-        document.getElementById("popupOverlay").classList.remove("active");
-      }
-    });
-
-    // Keyboard shortcuts
     document.addEventListener("keydown", (e) => {
-      // N key for new task
+      const tag = document.activeElement.tagName;
       if (
         e.key === "n" &&
         !e.ctrlKey &&
         !e.metaKey &&
-        document.activeElement.tagName !== "INPUT" &&
-        document.activeElement.tagName !== "TEXTAREA"
+        tag !== "INPUT" &&
+        tag !== "TEXTAREA"
       ) {
         e.preventDefault();
         this.toggleTaskCreator(true);
       }
-
-      // Escape key to close panels
       if (e.key === "Escape") {
         this.toggleTaskCreator(false);
         this.closeTaskDetail();
         this.closeSidebar();
-        document.getElementById("popupOverlay").classList.remove("active");
+        d.popupOverlay.classList.remove("active");
       }
     });
 
-    // Initialize default selections
     this.setPriority("med");
     this.setCategory("work");
   }
 
+  // ── Generic debounce helper ───────────────────────────────────────────────
+  _debounce(fn, delay) {
+    let timer;
+    return (...args) => {
+      clearTimeout(timer);
+      timer = setTimeout(() => fn.apply(this, args), delay);
+    };
+  }
+
   handleFormSubmit(e) {
     e.preventDefault();
+    const d = this.dom;
 
-    const titleInput = document.getElementById("todoText");
-    const dueDateInput = document.getElementById("todoDue");
-    const priorityInput = document.getElementById("todoPriority");
-    const categoryInput = document.getElementById("todoTag");
-
-    if (!titleInput.value.trim()) {
+    if (!d.todoText.value.trim()) {
       this.showToast("Please enter a task title", "warning");
       return;
     }
 
     const taskData = {
       id: this.editingTaskId || Date.now().toString(),
-      title: titleInput.value.trim(),
-      dueDate: dueDateInput.value || null,
-      priority: priorityInput.value,
-      category: categoryInput.value || "work",
+      title: d.todoText.value.trim(),
+      dueDate: d.todoDue.value || null,
+      priority: d.todoPriority.value,
+      category: d.todoTag.value || "work",
       completed: false,
       createdAt: new Date().toISOString(),
       order: this.tasks.length,
@@ -202,7 +241,6 @@ class VividTasks {
     };
 
     if (this.editingTaskId) {
-      // Update existing task
       const index = this.tasks.findIndex((t) => t.id === this.editingTaskId);
       if (index !== -1) {
         taskData.completed = this.tasks[index].completed;
@@ -213,14 +251,12 @@ class VividTasks {
       }
       this.showTaskDetail(this.editingTaskId);
       this.editingTaskId = null;
-      document.getElementById("submitBtnText").textContent = "Add Task";
+      d.submitBtnText.textContent = "Add Task";
     } else {
-      // Add new task
       this.tasks.push(taskData);
       this.showToast("Task added successfully", "success");
     }
 
-    // Save and update UI
     this.saveTasks();
     this.renderTasks();
     this.updateStats();
@@ -230,30 +266,29 @@ class VividTasks {
 
   handleQuickDate(e) {
     const action = e.currentTarget.getAttribute("data-quick");
-    const dateInput = document.getElementById("todoDue");
     const today = new Date();
 
     switch (action) {
       case "today":
-        dateInput.value = today.toISOString().split("T")[0];
+        this.dom.todoDue.value = today.toISOString().split("T")[0];
         break;
-      case "tomorrow":
-        const tomorrow = new Date(today);
-        tomorrow.setDate(tomorrow.getDate() + 1);
-        dateInput.value = tomorrow.toISOString().split("T")[0];
+      case "tomorrow": {
+        const d = new Date(today);
+        d.setDate(d.getDate() + 1);
+        this.dom.todoDue.value = d.toISOString().split("T")[0];
         break;
-      case "weekend":
-        const dayOfWeek = today.getDay();
-        const daysUntilSaturday = dayOfWeek === 0 ? 6 : 6 - dayOfWeek;
-        const saturday = new Date(today);
-        saturday.setDate(saturday.getDate() + daysUntilSaturday);
-        dateInput.value = saturday.toISOString().split("T")[0];
+      }
+      case "weekend": {
+        const dow = today.getDay();
+        const sat = new Date(today);
+        sat.setDate(sat.getDate() + (dow === 0 ? 6 : 6 - dow));
+        this.dom.todoDue.value = sat.toISOString().split("T")[0];
         break;
+      }
       default:
-        dateInput.value = "";
+        this.dom.todoDue.value = "";
     }
 
-    // Visual feedback
     e.currentTarget.style.transform = "scale(0.95)";
     setTimeout(() => {
       e.currentTarget.style.transform = "";
@@ -261,55 +296,38 @@ class VividTasks {
   }
 
   handlePrioritySelect(e) {
-    const priority = e.currentTarget.getAttribute("data-priority");
-    this.setPriority(priority);
+    this.setPriority(e.currentTarget.getAttribute("data-priority"));
   }
-
   handleCategorySelect(e) {
-    const category = e.currentTarget.getAttribute("data-category");
-    this.setCategory(category);
+    this.setCategory(e.currentTarget.getAttribute("data-category"));
   }
 
   handleFilterClick(e) {
-    const filter = e.currentTarget.getAttribute("data-filter");
-
-    // Update active state
-    document.querySelectorAll(".filter-chip").forEach((chip) => {
-      chip.classList.remove("active");
-    });
+    document
+      .querySelectorAll(".filter-chip")
+      .forEach((c) => c.classList.remove("active"));
     e.currentTarget.classList.add("active");
-
-    this.setFilter(filter);
+    this.setFilter(e.currentTarget.getAttribute("data-filter"));
   }
 
   setPriority(priority) {
-    document.querySelectorAll(".priority-option").forEach((btn) => {
-      btn.classList.remove("active");
-    });
-
-    const activeBtn = document.querySelector(
-      `.priority-option[data-priority="${priority}"]`,
-    );
-    if (activeBtn) {
-      activeBtn.classList.add("active");
-    }
-
-    document.getElementById("todoPriority").value = priority;
+    document
+      .querySelectorAll(".priority-option")
+      .forEach((btn) => btn.classList.remove("active"));
+    document
+      .querySelector(`.priority-option[data-priority="${priority}"]`)
+      ?.classList.add("active");
+    this.dom.todoPriority.value = priority;
   }
 
   setCategory(category) {
-    document.querySelectorAll(".category-option").forEach((btn) => {
-      btn.classList.remove("active");
-    });
-
-    const activeBtn = document.querySelector(
-      `.category-option[data-category="${category}"]`,
-    );
-    if (activeBtn) {
-      activeBtn.classList.add("active");
-    }
-
-    document.getElementById("todoTag").value = category;
+    document
+      .querySelectorAll(".category-option")
+      .forEach((btn) => btn.classList.remove("active"));
+    document
+      .querySelector(`.category-option[data-category="${category}"]`)
+      ?.classList.add("active");
+    this.dom.todoTag.value = category;
   }
 
   setFilter(filter) {
@@ -318,50 +336,40 @@ class VividTasks {
   }
 
   toggleTaskCreator(show) {
-    const creator = document.querySelector(".task-creator");
-    const newTaskBtn = document.getElementById("btnNewTask");
-
+    const { taskCreator, btnNewTask, todoText } = this.dom;
     if (show) {
-      creator.classList.add("active");
-      newTaskBtn.style.display = "none";
-      setTimeout(() => {
-        document.getElementById("todoText").focus();
-      }, 100);
+      taskCreator.classList.add("active");
+      btnNewTask.style.display = "none";
+      setTimeout(() => todoText.focus(), 100);
     } else {
-      creator.classList.remove("active");
-      newTaskBtn.style.display = "flex";
+      taskCreator.classList.remove("active");
+      btnNewTask.style.display = "flex";
       this.resetForm();
     }
   }
 
   toggleSidebar() {
-    const sidebar = document.getElementById("sidebar");
-    const overlay = document.getElementById("sidebarOverlay");
-
-    sidebar.classList.toggle("active");
-    overlay.classList.toggle("active");
+    this.dom.sidebar.classList.toggle("active");
+    this.dom.sidebarOverlay.classList.toggle("active");
   }
 
   closeSidebar() {
-    const sidebar = document.getElementById("sidebar");
-    const overlay = document.getElementById("sidebarOverlay");
-
-    sidebar.classList.remove("active");
-    overlay.classList.remove("active");
+    this.dom.sidebar.classList.remove("active");
+    this.dom.sidebarOverlay.classList.remove("active");
   }
 
   closeTaskDetail() {
-    document.querySelector(".task-detail").classList.remove("active");
+    this.dom.taskDetail.classList.remove("active");
   }
 
   resetForm() {
-    document.getElementById("todoForm").reset();
-    document.getElementById("todoText").value = "";
-    document.getElementById("todoDue").value = "";
+    this.dom.todoForm.reset();
+    this.dom.todoText.value = "";
+    this.dom.todoDue.value = "";
     this.setPriority("med");
     this.setCategory("work");
     this.editingTaskId = null;
-    document.getElementById("submitBtnText").textContent = "Add Task";
+    this.dom.submitBtnText.textContent = "Add Task";
   }
 
   editTask(taskId) {
@@ -369,41 +377,33 @@ class VividTasks {
     if (!task) return;
 
     this.editingTaskId = taskId;
-
-    // Fill form with task data
-    document.getElementById("todoText").value = task.title;
-    document.getElementById("todoDue").value = task.dueDate || "";
+    this.dom.todoText.value = task.title;
+    this.dom.todoDue.value = task.dueDate || "";
     this.setPriority(task.priority);
     this.setCategory(task.category);
-    document.getElementById("submitBtnText").textContent = "Update Task";
+    this.dom.submitBtnText.textContent = "Update Task";
 
-    // Show task creator
     this.toggleTaskCreator(true);
-
-    // Close task detail on mobile
     this.closeTaskDetail();
   }
 
   toggleTaskComplete(taskId) {
-    const taskIndex = this.tasks.findIndex((t) => t.id === taskId);
-    if (taskIndex === -1) return;
+    const idx = this.tasks.findIndex((t) => t.id === taskId);
+    if (idx === -1) return;
 
-    this.tasks[taskIndex].completed = !this.tasks[taskIndex].completed;
+    this.tasks[idx].completed = !this.tasks[idx].completed;
 
-    // Stop timer if running
-    if (this.timers[taskId]) {
-      this.stopTimer(taskId);
-    }
+    if (this.timers[taskId]) this.stopTimer(taskId);
 
     this.saveTasks();
     this.renderTasks();
     this.updateStats();
     this.showTaskDetail(taskId);
 
-    const action = this.tasks[taskIndex].completed
-      ? "completed"
-      : "marked active";
-    this.showToast(`Task ${action}`, "success");
+    this.showToast(
+      `Task ${this.tasks[idx].completed ? "completed" : "marked active"}`,
+      "success",
+    );
   }
 
   deleteTask(taskId) {
@@ -411,7 +411,6 @@ class VividTasks {
 
     this.tasks = this.tasks.filter((t) => t.id !== taskId);
 
-    // Stop and clear timer if running
     if (this.timers[taskId]) {
       this.stopTimer(taskId);
       delete this.timers[taskId];
@@ -421,9 +420,7 @@ class VividTasks {
     this.renderTasks();
     this.updateStats();
     this.closeTaskDetail();
-
-    const detailContent = document.querySelector(".detail-content");
-    detailContent.innerHTML = "";
+    this.dom.detailContent.innerHTML = "";
 
     this.showToast("Task deleted", "danger");
   }
@@ -443,6 +440,23 @@ class VividTasks {
     )
       return;
 
+    // Close detail panel if it's showing a completed task
+    if (this.dom.taskDetail.classList.contains("active")) {
+      const titleEl = this.dom.taskDetail.querySelector(
+        ".detail-header-row h4",
+      );
+      if (titleEl) {
+        const openTitle = titleEl.textContent.trim();
+        const isCompleted = this.tasks.some(
+          (t) => t.completed && this.escapeHtml(t.title) === openTitle,
+        );
+        if (isCompleted) {
+          this.closeTaskDetail();
+          this.dom.detailContent.innerHTML = "";
+        }
+      }
+    }
+
     this.tasks = this.tasks.filter((t) => !t.completed);
     this.saveTasks();
     this.renderTasks();
@@ -452,72 +466,53 @@ class VividTasks {
   }
 
   getFilteredTasks() {
-    let filtered = [...this.tasks];
-
-    // Apply search filter
-    const searchTerm = document
-      .getElementById("searchInput")
-      .value.toLowerCase();
-    if (searchTerm) {
-      filtered = filtered.filter(
-        (task) =>
-          task.title.toLowerCase().includes(searchTerm) ||
-          task.category.toLowerCase().includes(searchTerm),
-      );
-    }
-
-    // Apply status/category filter
+    const searchTerm = this.dom.searchInput.value.toLowerCase();
     const today = new Date().toISOString().split("T")[0];
     const now = new Date();
 
-    switch (this.currentFilter) {
-      case "active":
-        filtered = filtered.filter((task) => !task.completed);
-        break;
-      case "done":
-        filtered = filtered.filter((task) => task.completed);
-        break;
-      case "today":
-        filtered = filtered.filter((task) => task.dueDate === today);
-        break;
-      case "upcoming":
-        filtered = filtered.filter((task) => {
+    let filtered = this.tasks.filter((task) => {
+      // Search
+      if (
+        searchTerm &&
+        !task.title.toLowerCase().includes(searchTerm) &&
+        !task.category.toLowerCase().includes(searchTerm)
+      )
+        return false;
+
+      // Status / category filters
+      switch (this.currentFilter) {
+        case "active":
+          return !task.completed;
+        case "done":
+          return task.completed;
+        case "today":
+          return task.dueDate === today;
+        case "high":
+          return task.priority === "high";
+        case "no-date":
+          return !task.dueDate;
+        case "overdue":
+          return (
+            task.dueDate && !task.completed && new Date(task.dueDate) < now
+          );
+        case "upcoming": {
           if (!task.dueDate || task.completed) return false;
-          const dueDate = new Date(task.dueDate);
-          const nextWeek = new Date(now);
-          nextWeek.setDate(nextWeek.getDate() + 7);
-          return dueDate > now && dueDate <= nextWeek;
-        });
-        break;
-      case "high":
-        filtered = filtered.filter((task) => task.priority === "high");
-        break;
-      case "overdue":
-        filtered = filtered.filter(
-          (task) =>
-            task.dueDate && !task.completed && new Date(task.dueDate) < now,
-        );
-        break;
-      case "no-date":
-        filtered = filtered.filter((task) => !task.dueDate);
-        break;
-      case "work":
-      case "personal":
-      case "health":
-      case "learning":
-        filtered = filtered.filter(
-          (task) => task.category === this.currentFilter,
-        );
-        break;
-      case "all":
-      default:
-        // Show all tasks
-        break;
-    }
+          const due = new Date(task.dueDate);
+          const nextWk = new Date(now);
+          nextWk.setDate(nextWk.getDate() + 7);
+          return due > now && due <= nextWk;
+        }
+        case "work":
+        case "personal":
+        case "health":
+        case "learning":
+          return task.category === this.currentFilter;
+        default:
+          return true; // "all"
+      }
+    });
 
-    // Apply sorting
     this.sortTasks(filtered);
-
     return filtered;
   }
 
@@ -532,9 +527,9 @@ class VividTasks {
         });
         break;
       case "priority":
-        const priorityOrder = { high: 3, med: 2, low: 1 };
         tasks.sort(
-          (a, b) => priorityOrder[b.priority] - priorityOrder[a.priority],
+          (a, b) =>
+            this.PRIORITY_ORDER[b.priority] - this.PRIORITY_ORDER[a.priority],
         );
         break;
       case "created":
@@ -543,16 +538,13 @@ class VividTasks {
       case "alphabetical":
         tasks.sort((a, b) => a.title.localeCompare(b.title));
         break;
-      case "manual":
-      default:
+      default: // manual
         tasks.sort((a, b) => (a.order || 0) - (b.order || 0));
-        break;
     }
   }
 
   renderTasks() {
-    const taskList = document.getElementById("todoList");
-    const emptyState = document.getElementById("emptyState");
+    const { taskList, emptyState } = this.dom;
     const filteredTasks = this.getFilteredTasks();
 
     if (filteredTasks.length === 0) {
@@ -562,12 +554,9 @@ class VividTasks {
     }
 
     emptyState.classList.add("hidden");
-
     taskList.innerHTML = filteredTasks
       .map((task) => this.createTaskElement(task))
       .join("");
-
-    // Add event listeners to dynamically created elements
     this.attachTaskEventListeners();
   }
 
@@ -582,118 +571,73 @@ class VividTasks {
         })
       : "No due date";
 
-    const priorityLabels = {
-      high: "High",
-      med: "Medium",
-      low: "Low",
-    };
-
-    const categoryLabels = {
-      work: "Work",
-      personal: "Personal",
-      health: "Health",
-      learning: "Learning",
-      other: "Other",
-    };
+    // Use cached lookup maps instead of inline object literals
+    const priorityLabel = this.PRIORITY_LABELS[task.priority];
+    const categoryLabel = this.CATEGORY_LABELS[task.category] || task.category;
+    const safeTitle = this.escapeHtml(task.title);
+    const id = task.id;
 
     return `
-      <li class="task-item ${task.completed ? "done" : ""}" data-id="${
-        task.id
-      }" draggable="true">
-        <div class="task-checkbox ${
-          task.completed ? "checked" : ""
-        }" onclick="app.toggleTaskComplete('${task.id}')">
+      <li class="task-item ${task.completed ? "done" : ""}" data-id="${id}" draggable="true">
+        <div class="task-checkbox ${task.completed ? "checked" : ""}" onclick="app.toggleTaskComplete('${id}')">
           ${task.completed ? '<i class="fas fa-check"></i>' : ""}
         </div>
-        <div class="task-content" onclick="app.showTaskDetail('${task.id}')">
-          <div class="task-title">${this.escapeHtml(task.title)}</div>
+        <div class="task-content" onclick="app.showTaskDetail('${id}')">
+          <div class="task-title">${safeTitle}</div>
           <div class="task-meta">
-            <span class="task-priority ${task.priority}">${
-              priorityLabels[task.priority]
-            }</span>
+            <span class="task-priority ${task.priority}">${priorityLabel}</span>
             <span class="task-date ${isOverdue ? "overdue" : ""}">
               <i class="far fa-calendar"></i>
               ${dueDateText} ${isOverdue ? "(Overdue)" : ""}
             </span>
-            <span class="task-category">${
-              categoryLabels[task.category] || task.category
-            }</span>
+            <span class="task-category">${categoryLabel}</span>
           </div>
         </div>
         <div class="task-actions">
-          <button class="task-action-btn edit" onclick="app.editTask('${
-            task.id
-          }')" title="Edit task">
-            <i class="fas fa-edit"></i>
-          </button>
-          <button class="task-action-btn delete" onclick="app.deleteTask('${
-            task.id
-          }')" title="Delete task">
-            <i class="fas fa-trash-alt"></i>
-          </button>
+          <button class="task-action-btn edit"   onclick="app.editTask('${id}')"   title="Edit task"><i class="fas fa-edit"></i></button>
+          <button class="task-action-btn delete" onclick="app.deleteTask('${id}')" title="Delete task"><i class="fas fa-trash-alt"></i></button>
         </div>
-      </li>
-    `;
+      </li>`;
   }
 
   attachTaskEventListeners() {
-    // Drag and drop events
     document.querySelectorAll(".task-item").forEach((item) => {
       item.addEventListener("dragstart", (e) => {
         this.draggedItem = e.currentTarget;
         e.currentTarget.classList.add("dragging");
       });
-
       item.addEventListener("dragend", (e) => {
         e.currentTarget.classList.remove("dragging");
         this.draggedItem = null;
       });
-
       item.addEventListener("dragover", (e) => {
         e.preventDefault();
-        const afterElement = this.getDragAfterElement(
-          document.getElementById("todoList"),
-          e.clientY,
-        );
-        const container = document.getElementById("todoList");
-
-        if (afterElement == null) {
-          container.appendChild(this.draggedItem);
+        const after = this.getDragAfterElement(this.dom.taskList, e.clientY);
+        if (after == null) {
+          this.dom.taskList.appendChild(this.draggedItem);
         } else {
-          container.insertBefore(this.draggedItem, afterElement);
+          this.dom.taskList.insertBefore(this.draggedItem, after);
         }
       });
     });
   }
 
   getDragAfterElement(container, y) {
-    const draggableElements = [
-      ...container.querySelectorAll(".task-item:not(.dragging)"),
-    ];
-
-    return draggableElements.reduce(
+    return [...container.querySelectorAll(".task-item:not(.dragging)")].reduce(
       (closest, child) => {
         const box = child.getBoundingClientRect();
         const offset = y - box.top - box.height / 2;
-
-        if (offset < 0 && offset > closest.offset) {
-          return { offset: offset, element: child };
-        } else {
-          return closest;
-        }
+        return offset < 0 && offset > closest.offset
+          ? { offset, element: child }
+          : closest;
       },
       { offset: Number.NEGATIVE_INFINITY },
     ).element;
   }
 
   setupDragAndDrop() {
-    const taskList = document.getElementById("todoList");
-
-    taskList.addEventListener("dragover", (e) => {
-      e.preventDefault();
-    });
-
-    taskList.addEventListener("drop", (e) => {
+    this.dom.taskList.addEventListener("dragover", (e) => e.preventDefault());
+    this.dom.taskList.addEventListener("drop", (e) => {
       e.preventDefault();
       if (this.draggedItem) {
         this.updateTaskOrder();
@@ -703,15 +647,12 @@ class VividTasks {
   }
 
   updateTaskOrder() {
-    const taskElements = document.querySelectorAll(".task-item");
-    taskElements.forEach((element, index) => {
-      const taskId = element.getAttribute("data-id");
-      const taskIndex = this.tasks.findIndex((t) => t.id === taskId);
-      if (taskIndex !== -1) {
-        this.tasks[taskIndex].order = index;
-      }
+    this.dom.taskList.querySelectorAll(".task-item").forEach((el, index) => {
+      const idx = this.tasks.findIndex(
+        (t) => t.id === el.getAttribute("data-id"),
+      );
+      if (idx !== -1) this.tasks[idx].order = index;
     });
-
     this.saveTasks();
   }
 
@@ -719,24 +660,16 @@ class VividTasks {
     const task = this.tasks.find((t) => t.id === taskId);
     if (!task) return;
 
-    const detailContent = document.querySelector(".detail-content");
     const isOverdue =
       task.dueDate && !task.completed && new Date(task.dueDate) < new Date();
-
-    const priorityLabels = { high: "High", med: "Medium", low: "Low" };
-    const priorityColors = { high: "#ef4444", med: "#f59e0b", low: "#10b981" };
-    const categoryLabels = {
-      work: "Work",
-      personal: "Personal",
-      health: "Health",
-      learning: "Learning",
-      other: "Other",
-    };
-
+    const priorityColor = this.PRIORITY_COLORS[task.priority];
+    const priorityLabel = this.PRIORITY_LABELS[task.priority];
+    const categoryLabel = this.CATEGORY_LABELS[task.category] || task.category;
     const timeSpent = this.formatTime(task.timeSpent || 0);
-    const isTimerRunning = this.timers[taskId] && this.timers[taskId].running;
+    const isTimerRunning = this.timers[taskId]?.running;
+    const id = task.id;
 
-    detailContent.innerHTML = `
+    this.dom.detailContent.innerHTML = `
       <div class="task-detail-view">
         <div class="detail-header-row">
           <h4>${this.escapeHtml(task.title)}</h4>
@@ -750,20 +683,14 @@ class VividTasks {
           <div class="detail-grid">
             <div class="detail-item">
               <span class="detail-label">Priority:</span>
-              <span class="detail-value priority-badge" style="background: ${
-                priorityColors[task.priority]
-              }20; color: ${priorityColors[task.priority]}">
-                <span class="priority-dot" style="background: ${
-                  priorityColors[task.priority]
-                }"></span>
-                ${priorityLabels[task.priority]}
+              <span class="detail-value priority-badge" style="background:${priorityColor}20;color:${priorityColor}">
+                <span class="priority-dot" style="background:${priorityColor}"></span>
+                ${priorityLabel}
               </span>
             </div>
             <div class="detail-item">
               <span class="detail-label">Category:</span>
-              <span class="detail-value">${
-                categoryLabels[task.category] || task.category
-              }</span>
+              <span class="detail-value">${categoryLabel}</span>
             </div>
             <div class="detail-item">
               <span class="detail-label">Due Date:</span>
@@ -784,11 +711,7 @@ class VividTasks {
             <div class="detail-item">
               <span class="detail-label">Created:</span>
               <span class="detail-value">
-                ${new Date(task.createdAt).toLocaleDateString("en-US", {
-                  month: "short",
-                  day: "numeric",
-                  year: "numeric",
-                })}
+                ${new Date(task.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
               </span>
             </div>
           </div>
@@ -797,21 +720,15 @@ class VividTasks {
         <div class="detail-section">
           <h5><i class="fas fa-cog"></i> Actions</h5>
           <div class="action-buttons">
-            <button class="btn-action" onclick="app.toggleTaskComplete('${
-              task.id
-            }')">
+            <button class="btn-action" onclick="app.toggleTaskComplete('${id}')">
               <i class="fas ${task.completed ? "fa-undo" : "fa-check"}"></i>
               ${task.completed ? "Mark as Active" : "Mark Complete"}
             </button>
-            <button class="btn-action" onclick="app.editTask('${task.id}')">
-              <i class="fas fa-edit"></i>
-              Edit Task
+            <button class="btn-action" onclick="app.editTask('${id}')">
+              <i class="fas fa-edit"></i> Edit Task
             </button>
-            <button class="btn-action delete" onclick="app.deleteTask('${
-              task.id
-            }')">
-              <i class="fas fa-trash-alt"></i>
-              Delete Task
+            <button class="btn-action delete" onclick="app.deleteTask('${id}')">
+              <i class="fas fa-trash-alt"></i> Delete Task
             </button>
           </div>
         </div>
@@ -821,103 +738,78 @@ class VividTasks {
           <div class="time-tracking">
             <div class="time-display">
               <span class="time-label">Time Spent:</span>
-              <span class="time-value" id="time-${task.id}">${timeSpent}</span>
+              <span class="time-value" id="time-${id}">${timeSpent}</span>
             </div>
             <div class="time-controls">
-              <button class="btn-time ${
-                isTimerRunning ? "active" : ""
-              }" onclick="app.${isTimerRunning ? "stopTimer" : "startTimer"}('${
-                task.id
-              }')" id="timer-btn-${task.id}">
-                <i class="fas ${isTimerRunning ? "fa-pause" : "fa-play"}"></i> 
+              <button class="btn-time ${isTimerRunning ? "active" : ""}"
+                      onclick="app.${isTimerRunning ? "stopTimer" : "startTimer"}('${id}')"
+                      id="timer-btn-${id}">
+                <i class="fas ${isTimerRunning ? "fa-pause" : "fa-play"}"></i>
                 ${isTimerRunning ? "Pause" : "Start"} Timer
               </button>
-              <button class="btn-time" onclick="app.resetTimer('${task.id}')" ${
-                task.timeSpent ? "" : "disabled"
-              }>
+              <button class="btn-time" onclick="app.resetTimer('${id}')" ${task.timeSpent ? "" : "disabled"}>
                 <i class="fas fa-redo"></i> Reset
               </button>
             </div>
           </div>
         </div>
-      </div>
-    `;
+      </div>`;
 
-    // Show detail panel
-    document.querySelector(".task-detail").classList.add("active");
+    this.dom.taskDetail.classList.add("active");
   }
 
   formatTime(seconds) {
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    const secs = seconds % 60;
-
-    if (hours > 0) {
-      return `${hours}h ${minutes}m`;
-    } else if (minutes > 0) {
-      return `${minutes}m ${secs}s`;
-    } else {
-      return `${secs}s`;
-    }
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    const s = seconds % 60;
+    if (h > 0) return `${h}h ${m}m`;
+    if (m > 0) return `${m}m ${s}s`;
+    return `${s}s`;
   }
 
   startTimer(taskId) {
     const task = this.tasks.find((t) => t.id === taskId);
-    if (!task) return;
+    if (!task || this.timers[taskId]?.running) return;
 
-    if (this.timers[taskId] && this.timers[taskId].running) {
-      return;
-    }
+    // ── Drift-resistant timer: track wall-clock start time ────────────────
+    const taskIndex = this.tasks.findIndex((t) => t.id === taskId);
+    const baseTime = task.timeSpent || 0;
+    const startedAt = Date.now();
 
     this.timers[taskId] = {
       running: true,
-      startTime: Date.now(),
       interval: setInterval(() => {
-        const taskIndex = this.tasks.findIndex((t) => t.id === taskId);
-        if (taskIndex !== -1) {
-          this.tasks[taskIndex].timeSpent =
-            (this.tasks[taskIndex].timeSpent || 0) + 1;
-          this.saveTasks();
+        // Calculate elapsed seconds from wall clock to prevent drift
+        const elapsed = Math.floor((Date.now() - startedAt) / 1000);
+        this.tasks[taskIndex].timeSpent = baseTime + elapsed;
+        this.saveTasks();
 
-          // Update display if detail panel is open
-          const timeDisplay = document.getElementById(`time-${taskId}`);
-          if (timeDisplay) {
-            timeDisplay.textContent = this.formatTime(
-              this.tasks[taskIndex].timeSpent,
-            );
-          }
+        const timeDisplay = document.getElementById(`time-${taskId}`);
+        if (timeDisplay) {
+          timeDisplay.textContent = this.formatTime(
+            this.tasks[taskIndex].timeSpent,
+          );
         }
       }, 1000),
     };
 
-    // Update button
     const btn = document.getElementById(`timer-btn-${taskId}`);
     if (btn) {
       btn.innerHTML = '<i class="fas fa-pause"></i> Pause Timer';
       btn.classList.add("active");
       btn.setAttribute("onclick", `app.stopTimer('${taskId}')`);
-    }
-
-    // Enable reset button
-    const resetBtn = document.querySelector(
-      `#timer-btn-${taskId}`,
-    ).nextElementSibling;
-    if (resetBtn) {
-      resetBtn.disabled = false;
+      btn.nextElementSibling && (btn.nextElementSibling.disabled = false);
     }
 
     this.showToast("Timer started", "success");
   }
 
   stopTimer(taskId) {
-    if (!this.timers[taskId] || !this.timers[taskId].running) {
-      return;
-    }
+    if (!this.timers[taskId]?.running) return;
 
     clearInterval(this.timers[taskId].interval);
     this.timers[taskId].running = false;
 
-    // Update button
     const btn = document.getElementById(`timer-btn-${taskId}`);
     if (btn) {
       btn.innerHTML = '<i class="fas fa-play"></i> Start Timer';
@@ -929,81 +821,61 @@ class VividTasks {
   }
 
   resetTimer(taskId) {
-    if (!confirm("Are you sure you want to reset the timer for this task?")) {
+    if (!confirm("Are you sure you want to reset the timer for this task?"))
       return;
-    }
 
-    // Stop timer if running
-    if (this.timers[taskId]) {
-      this.stopTimer(taskId);
-    }
+    if (this.timers[taskId]) this.stopTimer(taskId);
 
-    // Reset time
-    const taskIndex = this.tasks.findIndex((t) => t.id === taskId);
-    if (taskIndex !== -1) {
-      this.tasks[taskIndex].timeSpent = 0;
+    const idx = this.tasks.findIndex((t) => t.id === taskId);
+    if (idx !== -1) {
+      this.tasks[idx].timeSpent = 0;
       this.saveTasks();
 
-      // Update display
       const timeDisplay = document.getElementById(`time-${taskId}`);
-      if (timeDisplay) {
-        timeDisplay.textContent = this.formatTime(0);
-      }
+      if (timeDisplay) timeDisplay.textContent = this.formatTime(0);
 
-      // Disable reset button
-      const resetBtn = document.querySelector(
-        `#timer-btn-${taskId}`,
-      ).nextElementSibling;
-      if (resetBtn) {
-        resetBtn.disabled = true;
-      }
+      const btn = document.getElementById(`timer-btn-${taskId}`);
+      if (btn?.nextElementSibling) btn.nextElementSibling.disabled = true;
     }
 
     this.showToast("Timer reset", "success");
   }
 
   updateStats() {
-    const totalTasks = this.tasks.length;
-    const activeTasks = this.tasks.filter((t) => !t.completed).length;
-    const completedTasks = this.tasks.filter((t) => t.completed).length;
-
-    // Today's tasks
+    const tasks = this.tasks;
+    const total = tasks.length;
+    const completed = tasks.filter((t) => t.completed).length;
+    const active = total - completed;
     const today = new Date().toISOString().split("T")[0];
-    const todayTasks = this.tasks.filter(
-      (t) => t.dueDate === today && !t.completed,
-    ).length;
-
-    // Upcoming tasks (next 7 days)
     const now = new Date();
     const nextWeek = new Date(now);
     nextWeek.setDate(nextWeek.getDate() + 7);
-    const upcomingTasks = this.tasks.filter((t) => {
-      if (!t.dueDate || t.completed) return false;
-      const dueDate = new Date(t.dueDate);
-      return dueDate > now && dueDate <= nextWeek;
-    }).length;
 
-    // Overdue tasks
-    const overdueTasks = this.tasks.filter(
+    const todayCount = tasks.filter(
+      (t) => t.dueDate === today && !t.completed,
+    ).length;
+    const upcomingCount = tasks.filter((t) => {
+      if (!t.dueDate || t.completed) return false;
+      const d = new Date(t.dueDate);
+      return d > now && d <= nextWeek;
+    }).length;
+    const overdueCount = tasks.filter(
       (t) => t.dueDate && !t.completed && new Date(t.dueDate) < now,
     ).length;
+    const rate = total > 0 ? Math.round((completed / total) * 100) : 0;
 
-    // Completion rate
-    const completionRate =
-      totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
-
-    // Update DOM
-    document.getElementById("countTotal").textContent = totalTasks;
-    document.getElementById("countActive").textContent = activeTasks;
-    document.getElementById("countDone").textContent = completedTasks;
-    document.getElementById("countToday").textContent = todayTasks;
-    document.getElementById("countUpcoming").textContent = upcomingTasks;
-    document.getElementById("activeTaskCount").textContent = activeTasks;
-    document.getElementById("todayCount").textContent = todayTasks;
-    document.getElementById("overdueCount").textContent = overdueTasks;
-    document.getElementById("completionRate").textContent =
-      `${completionRate}%`;
-    document.getElementById("completedTasksCount").textContent = completedTasks;
+    // Single consolidated DOM write block
+    const s = this.dom;
+    s.countTotal.textContent = total;
+    s.countActive.textContent = active;
+    s.countDone.textContent = completed;
+    s.countToday.textContent = todayCount;
+    s.countUpcoming.textContent = upcomingCount;
+    s.activeTaskCount.textContent = active;
+    s.todayCount.textContent = todayCount;
+    s.overdueCount.textContent = overdueCount;
+    s.completionRate.textContent = `${rate}%`;
+    s.completedTasksCount.textContent = completed;
   }
 
   saveTasks() {
@@ -1011,42 +883,24 @@ class VividTasks {
   }
 
   showToast(message, type = "info") {
-    const toastHost = document.getElementById("toastHost");
-    const toastId = "toast-" + Date.now();
-
-    const icons = {
-      success: "fa-check-circle",
-      warning: "fa-exclamation-triangle",
-      danger: "fa-times-circle",
-      info: "fa-info-circle",
-    };
+    const toastId = `toast-${Date.now()}`;
+    const icon = this.TOAST_ICONS[type] || "fa-info-circle";
 
     const toast = document.createElement("div");
     toast.className = `toast ${type}`;
     toast.id = toastId;
     toast.innerHTML = `
-      <div class="toast-icon">
-        <i class="fas ${icons[type] || "fa-info-circle"}"></i>
-      </div>
+      <div class="toast-icon"><i class="fas ${icon}"></i></div>
       <div class="toast-content">
-        <div class="toast-title">${
-          type.charAt(0).toUpperCase() + type.slice(1)
-        }</div>
+        <div class="toast-title">${type.charAt(0).toUpperCase() + type.slice(1)}</div>
         <div class="toast-message">${message}</div>
       </div>
       <button class="toast-close" onclick="document.getElementById('${toastId}').remove()">
         <i class="fas fa-times"></i>
-      </button>
-    `;
+      </button>`;
 
-    toastHost.appendChild(toast);
-
-    // Auto remove after 5 seconds
-    setTimeout(() => {
-      if (document.getElementById(toastId)) {
-        toast.remove();
-      }
-    }, 5000);
+    this.dom.toastHost.appendChild(toast);
+    setTimeout(() => document.getElementById(toastId)?.remove(), 5000);
   }
 
   escapeHtml(text) {
@@ -1056,14 +910,10 @@ class VividTasks {
   }
 }
 
-// Initialize the app when DOM is loaded
+// ── Bootstrap ────────────────────────────────────────────────────────────────
 let app;
-
 document.addEventListener("DOMContentLoaded", () => {
   app = new VividTasks();
-
-  document.getElementById("popupOverlay").classList.add("active");
+  window.app = app; // expose AFTER init so inline handlers always have a valid reference
+  app.dom.popupOverlay.classList.add("active");
 });
-
-// Make app available globally for inline event handlers
-window.app = app;
