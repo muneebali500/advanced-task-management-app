@@ -15,7 +15,7 @@ A feature-rich, responsive personal task manager built with pure HTML, CSS, and 
 
 ## 📸 Preview
 
-> [![pic](./images/desktop-view.png)](https://vivid-tasks.netlify.app/)
+> [![pic](./images/advanced-task-management-app.png)](https://vivid-tasks.netlify.app/)
 
 ---
 
