@@ -175,15 +175,22 @@ class VividTasks {
     d.sidebarOverlay.addEventListener("click", () => this.closeSidebar());
     d.btnCloseDetail.addEventListener("click", () => this.closeTaskDetail());
 
-    d.btnNotifications.addEventListener("click", () =>
-      d.popupOverlay.classList.add("active"),
-    );
-    d.closePopupBtn.addEventListener("click", () =>
-      d.popupOverlay.classList.remove("active"),
-    );
+    d.btnNotifications.addEventListener("click", () => {
+      d.popupOverlay.classList.add("active");
+      document.documentElement.style.overflow = "hidden";
+      document.body.style.overflow = "hidden";
+    });
+    d.closePopupBtn.addEventListener("click", () => {
+      d.popupOverlay.classList.remove("active");
+      document.documentElement.style.overflow = "";
+      document.body.style.overflow = "";
+    });
     d.popupOverlay.addEventListener("click", (e) => {
-      if (e.target === d.popupOverlay)
+      if (e.target === d.popupOverlay) {
         d.popupOverlay.classList.remove("active");
+        document.documentElement.style.overflow = "";
+        document.body.style.overflow = "";
+      }
     });
 
     document.addEventListener("keydown", (e) => {
@@ -203,6 +210,8 @@ class VividTasks {
         this.closeTaskDetail();
         this.closeSidebar();
         d.popupOverlay.classList.remove("active");
+        document.documentElement.style.overflow = "";
+        document.body.style.overflow = "";
       }
     });
 
@@ -916,4 +925,6 @@ document.addEventListener("DOMContentLoaded", () => {
   app = new VividTasks();
   window.app = app; // expose AFTER init so inline handlers always have a valid reference
   app.dom.popupOverlay.classList.add("active");
+  document.documentElement.style.overflow = "hidden";
+  document.body.style.overflow = "hidden";
 });
